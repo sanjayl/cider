@@ -400,16 +400,15 @@ With the actual value, the outermost '(not ...)' s-expression is removed."
                             (cider-font-lock-as-clojure expected)))
             (when actual
               (cider-insert "  actual: " 'font-lock-comment-face nil
-                            (cider-font-lock-as-clojure actual)))
-            (when error
-              (cider-insert "   error: " 'font-lock-comment-face nil)))
+                            (cider-font-lock-as-clojure actual))))
           (when error
+            (cider-propertize-region km
+              (cider-insert "   error: " 'font-lock-comment-face nil))
             (insert-text-button error
                               'follow-link t
                               'action '(lambda (_button) (cider-test-stacktrace))
-                              'help-echo "View causes and stacktrace"))
-          (cider-propertize-region km
-            (when error (cider-insert "\n")))
+                              'help-echo "View causes and stacktrace")
+            (cider-propertize-region km (cider-insert "\n")))
           (overlay-put (make-overlay beg (point)) 'font-lock-face bg))
         (insert "\n")))))
 
