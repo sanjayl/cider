@@ -153,14 +153,18 @@
     (define-key map (kbd "M-n") #'cider-test-next-result)
     (define-key map (kbd "M-.") #'cider-test-jump)
     (define-key map (kbd "<backtab>") #'cider-test-previous-result)
+    (define-key map (kbd "k") #'cider-test-previous-result)
+    (define-key map (kbd "p") #'cider-test-previous-result)
     (define-key map (kbd "TAB") #'cider-test-next-result)
+    (define-key map (kbd "j") #'cider-test-next-result)
+    (define-key map (kbd "n") #'cider-test-next-result)
     (define-key map (kbd "RET") #'cider-test-jump)
     (define-key map (kbd "t") #'cider-test-jump)
     (define-key map (kbd "d") #'cider-test-ediff)
     (define-key map (kbd "e") #'cider-test-stacktrace)
-    (define-key map (kbd "c") #'cider-test-compile)
-    (define-key map (kbd "r") #'cider-test-rerun-tests)
-    (define-key map (kbd "C") #'cider-test-compile-and-rerun)
+    (define-key map (kbd "c") #'cider-test-compile)  ;; TODO SANJAYL
+    (define-key map (kbd "r") #'cider-test-rerun-tests) ;; TODO SANJAYL
+    (define-key map (kbd "C") #'cider-test-compile-and-rerun) ;; TODO SANJAYL
     (define-key map "q" #'cider-popup-buffer-quit-function)
     (easy-menu-define cider-test-report-mode-menu map
       "Menu for CIDER's test result mode"
@@ -237,6 +241,7 @@
   (mouse-set-point click)
   (cider-test-jump))
 
+;; TODO SANJAYL
 (defun cider-test-compile (&optional arg)
   "Performs a `cider-load-file' for the file containing the symbol at point."
   (interactive "P")
@@ -255,6 +260,7 @@
           (error "Could not find the file with this error.")))
     (message "No test report at point.")))
 
+;; TODO SANJAYL
 (defun cider-test-compile-and-rerun (&optional arg)
   "Re-evaluates the file being tested and re-runs the failing tests"
   (interactive)
@@ -377,31 +383,33 @@ With the actual value, the outermost '(not ...)' s-expression is removed."
   "Emit into BUFFER report detail for the TEST assertion."
   (with-current-buffer buffer
     (nrepl-dbind-response test (var context type message expected actual error)
-      (cider-propertize-region (append (list 'keymap cider-test-report-mode-mouse-map) (cider-intern-keys (cdr test)))
+      (cider-propertize-region (cider-intern-keys (cdr test))
         (let ((beg (point))
               (type-face (cider-test-type-simple-face type))
-              (bg `(:background ,cider-test-items-background-color)))
-          (cider-insert (capitalize type) type-face nil " in ")
-          (cider-insert var 'font-lock-function-name-face nil " ")
-          (cider-insert "\n")
-          (when context  (cider-insert context 'font-lock-doc-face t))
-          (when message  (cider-insert message 'font-lock-doc-string-face t))
-          (when expected
-            (cider-insert "expected: " 'font-lock-comment-face nil
-                          (cider-font-lock-as-clojure expected)))
-          (when actual
-            (cider-insert "  actual: " 'font-lock-comment-face nil
-                          (cider-font-lock-as-clojure actual)))
+              (bg `(:background ,cider-test-items-background-color))
+              (km (list 'keymap cider-test-report-mode-mouse-map)))
+
+          (cider-propertize-region km
+            (cider-insert (capitalize type) type-face nil " in ")
+            (cider-insert var 'font-lock-function-name-face nil " ")
+            (cider-insert "\n")
+            (when context  (cider-insert context 'font-lock-doc-face t))
+            (when message  (cider-insert message 'font-lock-doc-string-face t))
+            (when expected
+              (cider-insert "expected: " 'font-lock-comment-face nil
+                            (cider-font-lock-as-clojure expected)))
+            (when actual
+              (cider-insert "  actual: " 'font-lock-comment-face nil
+                            (cider-font-lock-as-clojure actual)))
+            (when error
+              (cider-insert "   error: " 'font-lock-comment-face nil)))
           (when error
-            (cider-insert "   error: " 'font-lock-comment-face nil)
             (insert-text-button error
-                                'follow-link t
-                                'action '(lambda (_button) (cider-test-stacktrace))
-                                'help-echo "View causes and stacktrace")
-            (insert "\n"))
-          (cider-insert "     ")
-          (insert-text-button "[compile and rerun]" 'action 'cider-test-compile-and-rerun 'follow-link t)
-          (cider-insert "\n")
+                              'follow-link t
+                              'action '(lambda (_button) (cider-test-stacktrace))
+                              'help-echo "View causes and stacktrace"))
+          (cider-propertize-region km
+            (when error (cider-insert "\n")))
           (overlay-put (make-overlay beg (point)) 'font-lock-face bg))
         (insert "\n")))))
 
@@ -571,6 +579,7 @@ This uses the Leiningen convention of appending '-test' to the namespace name."
           ns
         (concat ns suffix)))))
 
+;; TODO SANJAYL -> complimentary fn, to help with compile and re-run
 
 ;;; Test execution
 
