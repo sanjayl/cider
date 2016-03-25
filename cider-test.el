@@ -178,6 +178,12 @@
         ["Display expected/actual diff" cider-test-ediff]))
     map))
 
+(defvar cider-test-report-mode-mouse-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-2] #'cider-test-mouse-jump)
+    (define-key map [down-mouse-2] 'undefined)
+    map))
+
 (define-derived-mode cider-test-report-mode fundamental-mode "Test Report"
   "Major mode for presenting Clojure test results.
 
@@ -224,6 +230,12 @@
     (cond ((cl-every 'null (list ns var line)) (message "No test report at point."))
           ((and ns var) (cider-find-var arg (concat ns "/" var) line))
           (t (cider-find-var arg)))))
+
+(defun cider-test-mouse-jump (click)
+  "Sets point at click location and then calls `cider-test-jump'."
+  (interactive "e")
+  (mouse-set-point click)
+  (cider-test-jump))
 
 (defun cider-test-compile (&optional arg)
   "Performs a `cider-load-file' for the file containing the symbol at point."
@@ -365,7 +377,7 @@ With the actual value, the outermost '(not ...)' s-expression is removed."
   "Emit into BUFFER report detail for the TEST assertion."
   (with-current-buffer buffer
     (nrepl-dbind-response test (var context type message expected actual error)
-      (cider-propertize-region (cider-intern-keys (cdr test))
+      (cider-propertize-region (append (list 'keymap cider-test-report-mode-mouse-map) (cider-intern-keys (cdr test)))
         (let ((beg (point))
               (type-face (cider-test-type-simple-face type))
               (bg `(:background ,cider-test-items-background-color)))
@@ -387,8 +399,6 @@ With the actual value, the outermost '(not ...)' s-expression is removed."
                                 'action '(lambda (_button) (cider-test-stacktrace))
                                 'help-echo "View causes and stacktrace")
             (insert "\n"))
-          (cider-insert "     ")
-          (insert-text-button "[link]" 'action 'cider-test-jump 'follow-link t)
           (cider-insert "     ")
           (insert-text-button "[compile and rerun]" 'action 'cider-test-compile-and-rerun 'follow-link t)
           (cider-insert "\n")
