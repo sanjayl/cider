@@ -35,6 +35,7 @@
 (require 'cider-compat)
 
 (require 'button)
+(require 'cl-lib)
 (require 'easymenu)
 (require 'seq)
 
@@ -157,6 +158,9 @@
     (define-key map (kbd "t") #'cider-test-jump)
     (define-key map (kbd "d") #'cider-test-ediff)
     (define-key map (kbd "e") #'cider-test-stacktrace)
+    (define-key map (kbd "c") #'cider-test-compile)
+    (define-key map (kbd "r") #'cider-test-rerun-tests)
+    (define-key map (kbd "C") #'cider-test-compile-and-rerun)
     (define-key map "q" #'cider-popup-buffer-quit-function)
     (easy-menu-define cider-test-report-mode-menu map
       "Menu for CIDER's test result mode"
@@ -217,9 +221,33 @@
   (let ((ns   (get-text-property (point) 'ns))
         (var  (get-text-property (point) 'var))
         (line (get-text-property (point) 'line)))
-    (if (and ns var)
-        (cider-find-var arg (concat ns "/" var) line)
-      (cider-find-var arg))))
+    (cond ((cl-every 'null (list ns var line)) (message "No test report at point."))
+          ((and ns var) (cider-find-var arg (concat ns "/" var) line))
+          (t (cider-find-var arg)))))
+
+(defun cider-test-compile (&optional arg)
+  "Performs a `cider-load-file' for the file containing the symbol at point."
+  (interactive "P")
+  (if-let ((ns  (get-text-property (point) 'ns))
+           (var (get-text-property (point) 'var)))
+      (let* ((info (cider-var-info (concat ns "/" var)))
+             (file  (nrepl-dict-get info "file"))
+             (name  (nrepl-dict-get info "name"))
+             (buffer (if (string-prefix-p "*" file)
+                         file
+                       (and file
+                            (not (cider--tooling-file-p file))
+                            (cider-find-file file)))))
+        (if buffer
+            (cider-eval-buffer buffer)
+          (error "Could not find the file with this error.")))
+    (message "No test report at point.")))
+
+(defun cider-test-compile-and-rerun (&optional arg)
+  "Re-evaluates the file being tested and re-runs the failing tests"
+  (interactive)
+  (cider-test-compile)
+  (cider-test-rerun-tests))
 
 ;;; Error stacktraces
 
@@ -342,7 +370,8 @@ With the actual value, the outermost '(not ...)' s-expression is removed."
               (type-face (cider-test-type-simple-face type))
               (bg `(:background ,cider-test-items-background-color)))
           (cider-insert (capitalize type) type-face nil " in ")
-          (cider-insert var 'font-lock-function-name-face t)
+          (cider-insert var 'font-lock-function-name-face nil " ")
+          (cider-insert "\n")
           (when context  (cider-insert context 'font-lock-doc-face t))
           (when message  (cider-insert message 'font-lock-doc-string-face t))
           (when expected
@@ -358,6 +387,11 @@ With the actual value, the outermost '(not ...)' s-expression is removed."
                                 'action '(lambda (_button) (cider-test-stacktrace))
                                 'help-echo "View causes and stacktrace")
             (insert "\n"))
+          (cider-insert "     ")
+          (insert-text-button "[link]" 'action 'cider-test-jump 'follow-link t)
+          (cider-insert "     ")
+          (insert-text-button "[compile and rerun]" 'action 'cider-test-compile-and-rerun 'follow-link t)
+          (cider-insert "\n")
           (overlay-put (make-overlay beg (point)) 'font-lock-face bg))
         (insert "\n")))))
 
