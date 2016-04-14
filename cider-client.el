@@ -840,6 +840,14 @@ Optional arguments include SEARCH-NS, DOCS-P, PRIVATES-P, CASE-SENSITIVE-P."
     (cider-nrepl-send-sync-request)
     (nrepl-dict-get "classpath")))
 
+(defun cider-sync-request:dependencies ()
+  "Return a list of all ns on classpath and their dependencies."
+  (cider-ensure-op-supported "dependencies")
+  (thread-first (list "op" "dependencies"
+                      "session" (cider-current-session))
+    (cider-nrepl-send-sync-request)
+    (nrepl-dict-get "dependencies")))
+
 (defun cider-sync-request:complete (str context)
   "Return a list of completions for STR using nREPL's \"complete\" op.
 CONTEXT represents a completion context for compliment."
