@@ -846,11 +846,23 @@ If no argument is given, will return information on all namespaces in the
 classpath.  If optional argument NAMESPACE is given, will limit information
 to just this namespace."
   (cider-ensure-op-supported "dependencies")
-  (thread-first `("op" "dependencies"
-                  "session" ,(cider-current-session)
-                  ,@(when namespace (list "ns" namespace)))
-    (cider-nrepl-send-sync-request)
-    (nrepl-dict-get "dependencies")))
+  (let* ((dict (thread-first `("op" "dependencies"
+                               "session" ,(cider-current-session)
+                               ,@(when namespace (list "ns" namespace)))
+                 (cider-nrepl-send-sync-request)))
+         (err  (nrepl-dict-get dict "err")))
+    (when err (error (car (split-string err "\n"))))
+    (nrepl-dict-get dict "dependencies")))
+
+(defun cider-sync-request:circular ()
+  "Return a list of circular dependencies on the classpath."
+  (cider-ensure-op-supported "circular")
+  (let* ((dict (thread-first (list "op" "circular"
+                                   "session" (cider-current-session))
+                 (cider-nrepl-send-sync-request)))
+         (err  (nrepl-dict-get dict "err")))
+    (when err (error (car (split-string err "\n"))))
+    (nrepl-dict-get dict "dependencies")))
 
 (defun cider-sync-request:complete (str context)
   "Return a list of completions for STR using nREPL's \"complete\" op.

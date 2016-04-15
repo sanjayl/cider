@@ -79,7 +79,7 @@
 (defun cider-browse-deps--list (buffer title items)
   "Reset contents of BUFFER.
 Display TITLE at the top and ITEMS are indented underneath."
-  (with-current-buffer buffer
+  (with-current-buffer (cider-popup-buffer buffer t)
     (cider-browse-deps-mode)
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -98,27 +98,36 @@ Display TITLE at the top and ITEMS are indented underneath."
       (goto-char (point-min)))))
 
 ;; Interactive Functions
+;;;###autoload
+(defun cider-browse-circular-deps-all ()
+  "Shows all circular dependencies on classpath."
+  (interactive)
+  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+    (when-let ((deps (cider-sync-request:circular)))
+      (cider-browse-deps--list (current-buffer)
+                               "Circular Dependencies on classpath."
+                               deps))))
 
 ;;;###autoload
 (defun cider-browse-deps (namespace)
   "Gets NAMESPACE's dependencies."
   (interactive (list (completing-read "Dependencies for NS: "
                                       (seq-map #'car (cider-sync-request:dependencies)))))
-  (with-current-buffer (cider-popup-buffer cider-browse-deps-buffer t)
-    (let ((deps (cider-sync-request:dependencies namespace)))
+  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+    (when-let ((deps (cider-sync-request:dependencies namespace)))
       (cider-browse-deps--list (current-buffer)
-                             "Namespaces in classpath and their dependencies."
-                             deps))))
+                               "Namespaces in classpath and their dependencies."
+                               deps))))
 
 ;;;###autoload
 (defun cider-browse-deps-all ()
   "List all NAMESPACE's on classpath and their dependencies."
   (interactive)
-  (with-current-buffer (cider-popup-buffer cider-browse-deps-buffer t)
-    (let ((deps (cider-sync-request:dependencies)))
+  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+    (when-let ((deps (cider-sync-request:dependencies)))
       (cider-browse-deps--list (current-buffer)
-                             "Namespaces in classpath and their dependencies."
-                             deps))))
+                               "Namespaces in classpath and their dependencies."
+                               deps))))
 
 ;;; Navigation/Actions
 
