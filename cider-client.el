@@ -840,11 +840,15 @@ Optional arguments include SEARCH-NS, DOCS-P, PRIVATES-P, CASE-SENSITIVE-P."
     (cider-nrepl-send-sync-request)
     (nrepl-dict-get "classpath")))
 
-(defun cider-sync-request:dependencies ()
-  "Return a list of all ns on classpath and their dependencies."
+(defun cider-sync-request:dependencies (&optional namespace)
+  "Return a list of namespaces and dependencies.
+If no argument is given, will return information on all namespaces in the
+classpath.  If optional argument NAMESPACE is given, will limit information
+to just this namespace."
   (cider-ensure-op-supported "dependencies")
-  (thread-first (list "op" "dependencies"
-                      "session" (cider-current-session))
+  (thread-first `("op" "dependencies"
+                  "session" ,(cider-current-session)
+                  ,@(when namespace (list "ns" namespace)))
     (cider-nrepl-send-sync-request)
     (nrepl-dict-get "dependencies")))
 

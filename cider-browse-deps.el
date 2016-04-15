@@ -31,14 +31,30 @@
 (require 'cider-compat)
 (require 'cider-util)
 
+(defgroup cider-browse-deps nil
+  "Dependency browsing and navigation."
+  :prefix "cider-browse-deps-"
+  :package-version `(cider . "0.12.0")
+  :group 'cider)
+
 (defconst cider-browse-deps-buffer "*cider-deps-browser*")
 
 (push cider-browse-deps-buffer cider-ancillary-buffers)
 
 ;;; TODO SANJAYL (defvar-local cider-browse-ns-current-ns nil)
 
-;; Mode Definition
+;;; FACES
+(defface cider-browse-deps-ns-face
+  '((t (:inherit font-lock-type-face)))
+  "Face for a namespace on the classpath."
+  :group 'cider-browse-deps)
 
+(defface cider-browse-deps-dep-face
+  '((t (:inherit shadow)))
+  "Face for a namespace's dependency/dependencies."
+  :group 'cider-browse-deps)
+
+;; Mode Definition
 (defvar cider-browse-deps-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map cider-popup-buffer-mode-map)
@@ -50,6 +66,10 @@
     (define-key map "j" #'next-line)
     (define-key map "p" #'previous-line)
     (define-key map "k" #'previous-line)
+    (define-key map "N" #'cider-browse-deps--next-ns)
+    (define-key map "J" #'cider-browse-deps--next-ns)
+    (define-key map "P" #'cider-browse-deps--previous-ns)
+    (define-key map "K" #'cider-browse-deps--previous-ns)
     map))
 
 ;;; TODO SANJAYL 
@@ -68,6 +88,8 @@
   ;;; TODO SANJAYL (setq-local cider-browse-ns-current-ns nil)
   )
 
+
+
 ;;; TODO SANJAYL 
 ;; (defun cider-browse-ns--text-face (text)
 ;;   "Match TEXT with a face."
@@ -84,6 +106,7 @@
 ;;                 'font-lock-face face
 ;;                 'mouse-face 'highlight
 ;;                 'keymap cider-browse-ns-mouse-map)))
+
 
 ;;; TODO SANJAYL 
 ;; (defun cider-browse-ns--list (buffer title items &optional ns noerase)
@@ -111,24 +134,56 @@ Display TITLE at the top and ITEMS are indented underneath."
     (let ((inhibit-read-only t))
       (erase-buffer)  ;; TODO SANJAYL: figure out if you need the (unless noerase (erase-buffer)) and the optional noerase arg
       (goto-char (point-max))
-      (insert (cider-propertize title 'emph) "\n")
+      (insert (cider-propertize title 'emph) "\n\n")
       (dolist (item items)
-        (insert (concat "  " (car item) "\n"))
+        (insert (propertize (concat "  " (car item) "\n")
+                            'face 'cider-browse-deps-ns-face
+                            'id (car item)
+                            'type 'ns))
         (dolist (subitem (cadr item))
-          (insert (concat "    " subitem "\n")))) ;; TODO SANJAYL: do we need any props here
+          (insert (propertize (concat "    " subitem "\n")
+                              'face 'cider-browse-deps-dep-face
+                              'id (car item)
+                              'type 'dep))))
       (goto-char (point-min)))))
 
 ;; Interactive Functions
 
 ;;;###autoload
-(defun cider-browse-deps ()
+(defun cider-browse-deps (namespace)
+  "Gets NAMESPACE's dependencies."
+  (interactive (list (completing-read "Dependencies for NS: " (seq-map #'car (cider-sync-request:dependencies)))))
+  (with-current-buffer (cider-popup-buffer cider-browse-deps-buffer t)
+    (let ((deps (cider-sync-request:dependencies namespace)))
+      (cider-browse-deps--list (current-buffer)
+                             "Namespaces in classpath and their dependencies."
+                             deps))))
+
+;;;###autoload
+(defun cider-browse-deps-all ()
   "List all NAMESPACE's on classpath and their dependencies."
   (interactive)
   (with-current-buffer (cider-popup-buffer cider-browse-deps-buffer t)
     (let ((deps (cider-sync-request:dependencies)))
       (cider-browse-deps--list (current-buffer)
-                             "All namespaces on classpath"
+                             "Namespaces in classpath and their dependencies."
                              deps))))
+
+;;; Navigation/Actions
+
+(defun cider-browse-deps--next-ns ()
+  (interactive)
+  "Advance point to the next NS in the list."
+  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+    (when-let ((pos (next-single-property-change (point) 'id)))
+      (goto-char pos))))
+
+(defun cider-browse-deps--previous-ns ()
+  (interactive)
+  "Retract point to the previous NS in the list."
+  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+    (when-let ((pos (previous-single-property-change (point) 'id)))
+      (goto-char pos))))
 
 (defun cider-browse-ns--thing-at-point ()
   "Get the thing at point.
@@ -177,6 +232,6 @@ be displayed."
   (interactive "e")
   (cider-browse-ns-operate-at-point))
 
-(provide 'cider-browse-ns)
+(provide 'cider-browse-deps)
 
 ;;; cider-browse-ns.el ends here
