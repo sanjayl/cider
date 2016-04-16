@@ -102,7 +102,7 @@ Display TITLE at the top and ITEMS are indented underneath."
 (defun cider-browse-circular-deps-all ()
   "Shows all circular dependencies on classpath."
   (interactive)
-  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+  (with-current-buffer (get-buffer-create cider-browse-deps-buffer)
     (when-let ((deps (cider-sync-request:circular)))
       (cider-browse-deps--list (current-buffer)
                                "Circular Dependencies on classpath."
@@ -113,7 +113,7 @@ Display TITLE at the top and ITEMS are indented underneath."
   "Gets NAMESPACE's dependencies."
   (interactive (list (completing-read "Dependencies for NS: "
                                       (seq-map #'car (cider-sync-request:dependencies)))))
-  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+  (with-current-buffer (get-buffer-create cider-browse-deps-buffer)
     (when-let ((deps (cider-sync-request:dependencies namespace)))
       (cider-browse-deps--list (current-buffer)
                                "Namespaces in classpath and their dependencies."
@@ -123,7 +123,7 @@ Display TITLE at the top and ITEMS are indented underneath."
 (defun cider-browse-deps-all ()
   "List all NAMESPACE's on classpath and their dependencies."
   (interactive)
-  (with-current-buffer (get-buffer cider-browse-deps-buffer)
+  (with-current-buffer (get-buffer-create cider-browse-deps-buffer)
     (when-let ((deps (cider-sync-request:dependencies)))
       (cider-browse-deps--list (current-buffer)
                                "Namespaces in classpath and their dependencies."
