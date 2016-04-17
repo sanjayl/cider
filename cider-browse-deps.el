@@ -31,6 +31,7 @@
 (require 'cider-client)
 (require 'cider-compat)
 (require 'cider-util)
+(require 'dired)
 
 (defgroup cider-browse-deps nil
   "Dependency browsing and navigation."
@@ -43,17 +44,35 @@
 (push cider-browse-deps-buffer cider-ancillary-buffers)
 
 (defhydra def-browse-help ()
-  "Movement in this buffer"
-   ("n" next-line "Next Line")
-   ("j" next-line "Next Line")
-   ("p" previous-line "Previous Line")
-   ("k" previous-line "Previous Line")
-   ("N" cider-browse-deps--next-ns "Next NS")
-   ("J" cider-browse-deps--next-ns "Next NS")
-   ("P" cider-browse-deps--previous-ns "Previous NS")
-   ("K" cider-browse-deps--previous-ns "Previous NS")
-   ("q" cider-popup-buffer-quit-function "Quit Browser" :color blue)
-   ("?" nil "Close Help Popup"))
+  "
+Movement:
+_n_/_j_: Next Line          _N_/_J_: Next Heading
+_p_/_k_: Previous Line      _P_/_K_: Previous Heading
+
+Actions:
+_d_:^^ Documentation of namespace              _f_: Filter by Glob
+_s_/_<return>_: Goto source of namespace       _F_: Filter by Emacs RegEx
+^ ^ ^        ^                                 _r_: Reset filtering
+
+Exiting:
+_q_: Quit browser
+_?_: Close this help popup."
+  ("n" next-line nil)
+  ("j" next-line nil)
+  ("p" previous-line nil)
+  ("k" previous-line nil)
+  ("N" cider-browse-deps--next-ns nil)
+  ("J" cider-browse-deps--next-ns nil)
+  ("P" cider-browse-deps--previous-ns nil)
+  ("K" cider-browse-deps--previous-ns nil)
+  ("d" cider-browse-ns-doc-at-point nil)
+  ("s" cider-browse-ns-find-at-point nil :color blue)
+  ("f" cider-browse-deps--filter-by-glob nil)
+  ("F" cider-browse-deps--filter-by-regex nil)
+  ("r" cider-browse-deps--reset-filter nil)
+  ("<return>" cider-browse-ns-find-at-point nil :color blue)
+  ("q" cider-popup-buffer-quit-function nil :color blue)
+  ("?" nil nil))
 
 ;;; FACES
 (defface cider-browse-deps-ns-face
@@ -71,7 +90,6 @@
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map cider-popup-buffer-mode-map)
     (define-key map "?" #'def-browse-help/body)
-    (define-key map [return] #'cider-browse-ns-find-at-point)
     (define-key map "n" #'next-line)
     (define-key map "j" #'next-line)
     (define-key map "p" #'previous-line)
@@ -80,6 +98,12 @@
     (define-key map "J" #'cider-browse-deps--next-ns)
     (define-key map "P" #'cider-browse-deps--previous-ns)
     (define-key map "K" #'cider-browse-deps--previous-ns)
+    (define-key map "d" #'cider-browse-ns-doc-at-point)
+    (define-key map [return] #'cider-browse-ns-find-at-point)
+    (define-key map "f" #'cider-browse-deps--filter-by-glob)
+    (define-key map "F" #'cider-browse-deps--filter-by-regex)
+    (define-key map "r" #'cider-browse-deps--reset-filter)
+    ;; q for quit inherited from cider-popup-buffer-mode-map
     map))
 
 (define-derived-mode cider-browse-deps-mode special-mode "browse-deps"
@@ -89,6 +113,36 @@
   (setq buffer-read-only t)
   (setq-local electric-indent-chars nil)
   (setq-local truncate-lines t))
+
+;;; ACTIONS
+
+(defun cider-browse-deps--filter-by-glob (glob)
+  (interactive "sGlob pattern to filter by: ")
+  (cider-browse-deps--filter-by-regex (dired-glob-regexp glob)))
+
+(defun cider-browse-deps--filter-by-regex (re)
+  (interactive "sEmacs-style regex to filter by: ")
+  (with-current-buffer cider-browse-deps-buffer
+    (let ((inhibit-read-only t)
+          (pos (point)))
+      (goto-char (point-min))
+      (while (not (eobp))
+        (cond ((null (get-text-property (point) 'heading)) (forward-line))
+              ((or (string-match re (get-text-property (point) 'heading))
+                   (string-match re (get-text-property (point) 'id)))
+               (let ((start (point)))
+                 (forward-line)
+                 (add-text-properties start (point) '(invisible t))))
+              (t (forward-line))))
+      (goto-char pos))))
+
+(defun cider-browse-deps--reset-filter ()
+  (interactive)
+  (with-current-buffer cider-browse-deps-buffer
+    (let ((inhibit-read-only t)
+          (pos (point)))
+      (remove-text-properties (point-min) (point-max) '(invisible nil))
+      (goto-char pos))))
 
 (defun cider-browse-deps--list (buffer title items)
   "Reset contents of BUFFER.
@@ -102,13 +156,15 @@ Display TITLE at the top and ITEMS are indented underneath."
       (dolist (item items)
         (insert (propertize (concat "  " (car item) "\n")
                             'face 'cider-browse-deps-ns-face
-                            'id (car item)
-                            'type 'ns))
+                            'heading (car item)
+                            'type 'ns
+                            'id (car item)))
         (dolist (subitem (cadr item))
           (insert (propertize (concat "    " subitem "\n")
                               'face 'cider-browse-deps-dep-face
-                              'id (car item)
-                              'type 'dep))))
+                              'heading (car item)
+                              'type 'dep
+                              'id subitem))))
       (goto-char (point-min)))))
 
 ;; Interactive Functions
@@ -149,14 +205,14 @@ Display TITLE at the top and ITEMS are indented underneath."
   (interactive)
   "Advance point to the next NS in the list."
   (with-current-buffer (get-buffer cider-browse-deps-buffer)
-    (when-let ((pos (next-single-property-change (point) 'id)))
+    (when-let ((pos (next-single-property-change (point) 'heading)))
       (goto-char pos))))
 
 (defun cider-browse-deps--previous-ns ()
   (interactive)
   "Retract point to the previous NS in the list."
   (with-current-buffer (get-buffer cider-browse-deps-buffer)
-    (when-let ((pos (previous-single-property-change (point) 'id)))
+    (when-let ((pos (previous-single-property-change (point) 'heading)))
       (goto-char pos))))
 
 (provide 'cider-browse-deps)
