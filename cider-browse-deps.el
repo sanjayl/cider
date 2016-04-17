@@ -42,6 +42,19 @@
 
 (push cider-browse-deps-buffer cider-ancillary-buffers)
 
+(defhydra def-browse-help ()
+  "Movement in this buffer"
+   ("n" next-line "Next Line")
+   ("j" next-line "Next Line")
+   ("p" previous-line "Previous Line")
+   ("k" previous-line "Previous Line")
+   ("N" cider-browse-deps--next-ns "Next NS")
+   ("J" cider-browse-deps--next-ns "Next NS")
+   ("P" cider-browse-deps--previous-ns "Previous NS")
+   ("K" cider-browse-deps--previous-ns "Previous NS")
+   ("q" cider-popup-buffer-quit-function "Quit Browser" :color blue)
+   ("?" nil "Close Help Popup"))
+
 ;;; FACES
 (defface cider-browse-deps-ns-face
   '((t (:inherit font-lock-type-face)))
@@ -57,6 +70,7 @@
 (defvar cider-browse-deps-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map cider-popup-buffer-mode-map)
+    (define-key map "?" #'def-browse-help/body)
     (define-key map [return] #'cider-browse-ns-find-at-point)
     (define-key map "n" #'next-line)
     (define-key map "j" #'next-line)
