@@ -36,14 +36,36 @@
 (defgroup cider-browse-deps nil
   "Dependency browsing and navigation."
   :prefix "cider-browse-deps-"
-  :package-version `(cider . "0.12.0")
+  :package-version `(cider . "0.13.0")
   :group 'cider)
 
 (defconst cider-browse-deps-buffer "*cider-deps-browser*")
 
 (push cider-browse-deps-buffer cider-ancillary-buffers)
 
-(defhydra def-browse-help ()
+;;; FACES
+(defface cider-browse-deps-ns-face
+  '((t (:inherit font-lock-type-face)))
+  "Face for a namespace on the classpath."
+  :group 'cider-browse-deps)
+
+(defface cider-browse-deps-dep-face
+  '((t (:inherit shadow)))
+  "Face for a namespace's dependency/dependencies."
+  :group 'cider-browse-deps)
+
+(defface cider-browse-deps-circular-ns-face
+  '((t (:inherit error)))
+  "Face for a namespace with circular dependencies."
+  :group 'cider-browse-deps)
+
+(defun cider-browse-deps--choose-heading-face (heading)
+  (if (s-contains? "Circular Dependency Error" heading)
+      cider-browse-deps-circular-ns-face
+    cider-browse-deps-ns-face))
+
+;;; Mode Definition
+(defhydra def-browse-help (:color pink)
   "
 Movement:
 _n_/_j_: Next Line          _N_/_J_: Next Heading
@@ -56,7 +78,7 @@ _s_/_<return>_: Goto source of namespace       _F_: Filter by Emacs RegEx
 
 Exiting:
 _q_: Quit browser
-_?_: Close this help popup."
+_?_/_g_: Close this popup"
   ("n" next-line nil)
   ("j" next-line nil)
   ("p" previous-line nil)
@@ -72,20 +94,9 @@ _?_: Close this help popup."
   ("r" cider-browse-deps--reset-filter nil)
   ("<return>" cider-browse-ns-find-at-point nil :color blue)
   ("q" cider-popup-buffer-quit-function nil :color blue)
+  ("g" nil nil)
   ("?" nil nil))
 
-;;; FACES
-(defface cider-browse-deps-ns-face
-  '((t (:inherit font-lock-type-face)))
-  "Face for a namespace on the classpath."
-  :group 'cider-browse-deps)
-
-(defface cider-browse-deps-dep-face
-  '((t (:inherit shadow)))
-  "Face for a namespace's dependency/dependencies."
-  :group 'cider-browse-deps)
-
-;;; Mode Definition
 (defvar cider-browse-deps-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map cider-popup-buffer-mode-map)
@@ -154,17 +165,18 @@ Display TITLE at the top and ITEMS are indented underneath."
       (goto-char (point-max))
       (insert (cider-propertize title 'emph) "\n\n")
       (dolist (item items)
-        (insert (propertize (concat "  " (car item) "\n")
-                            'face 'cider-browse-deps-ns-face
-                            'heading (car item)
-                            'type 'ns
-                            'id (car item)))
-        (dolist (subitem (cadr item))
-          (insert (propertize (concat "    " subitem "\n")
-                              'face 'cider-browse-deps-dep-face
-                              'heading (car item)
-                              'type 'dep
-                              'id subitem))))
+        (let ((heading (car item)))
+          (insert (propertize (concat "  " heading "\n")
+                                      'face (cider-browse-deps--choose-heading-face heading)
+                                      'heading heading
+                                      'type 'ns
+                                      'id heading))
+          (dolist (subitem (cadr item))
+            (insert (propertize (concat "    " subitem "\n")
+                                'face 'cider-browse-deps-dep-face
+                                'heading heading
+                                'type 'dep
+                                'id subitem)))))
       (goto-char (point-min)))))
 
 ;; Interactive Functions
